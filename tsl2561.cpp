@@ -25,27 +25,72 @@ char TSL2561::begin()
   char value = 0;
   char error;
   
-  Serial.println("I2C ID");
-  Serial.println(  _i2c_bus->status(),HEX);
-  Serial.println(  _i2c_bus->start_i2c(),HEX);
-  Serial.println(  _i2c_bus->write(TSL2561_ADDRESS | I2C_WRITE),HEX);
-  Serial.println(  _i2c_bus->write(TSL2561_COMMAND | TSL2561_CONTROL),HEX);
-  Serial.println(  _i2c_bus->write(0x02),HEX);
-  Serial.println(  _i2c_bus->start_i2c(),HEX);
-  Serial.println(  _i2c_bus->write(TSL2561_ADDRESS | I2C_READ),HEX);
-  value =          _i2c_bus->read(&error,1);
+  if (_i2c_bus->status() != I2C_AVAILABLE)
+  {
+	  return TSL2561_BEGIN_FAIL;
+  }
   
-  Serial.println(error,HEX);
+  /* Turn the device on and readback the register to make sure
+   * that the device is there.
+   */
+  _i2c_bus->start_i2c();
+  _i2c_bus->write(TSL2561_ADDRESS | I2C_WRITE);
+  _i2c_bus->write(TSL2561_COMMAND | TSL2561_CONTROL);
+  _i2c_bus->write(TSL2561_POWER_ON);
+  _i2c_bus->start_i2c();
+  _i2c_bus->write(TSL2561_ADDRESS | I2C_READ);
+
+  value = _i2c_bus->read(&error,I2C_NACK);
+
+  _i2c_bus->stop_i2c();  
+
+  if (value != TSL2561_POWER_ON)
+  {
+	  return TSL2561_POWER_ON_FAIL;
+  }
   
-  Serial.println(  _i2c_bus->stop_i2c(),HEX);  
+  if (_i2c_bus->status() != I2C_AVAILABLE)
+  {
+	  return TSL2561_BEGIN_FAIL;
+  }
   
+  _i2c_bus->start_i2c();
+  _i2c_bus->write(TSL2561_ADDRESS | I2C_WRITE);
+  _i2c_bus->write(TSL2561_COMMAND | TSL2561_INTERRUPT);
+  _i2c_bus->write(TSL2561_INTERRUPT_OFF);
+  _i2c_bus->stop_i2c();    
   
-  return value;
+  _i2c_bus->start_i2c();
+  _i2c_bus->write(TSL2561_ADDRESS | I2C_WRITE);
+  _i2c_bus->write(TSL2561_COMMAND | TSL2561_TIMING);
+  _i2c_bus->write(0x00);
+  _i2c_bus->stop_i2c();    
+  
+  return TSL2561_STARTUP_OK;
 }
 
 char TSL2561::run()
 {
-	return 0;
+  char value = 0;
+  char error;	
+	
+  _i2c_bus->start_i2c();
+  _i2c_bus->write(TSL2561_ADDRESS | I2C_WRITE);
+  _i2c_bus->write(TSL2561_COMMAND | TSL2561_DATA_0_LOW);
+  _i2c_bus->start_i2c();
+  _i2c_bus->write(TSL2561_ADDRESS | I2C_READ);
+
+  value = _i2c_bus->read(&error,I2C_ACK);
+  whiteLight = value;
+  value = _i2c_bus->read(&error,I2C_ACK);
+  whiteLight += (value << 8);
+  
+  value = _i2c_bus->read(&error,I2C_ACK);
+  irLight = value;
+  value = _i2c_bus->read(&error,I2C_NACK);
+  irLight += (value << 8);
+  
+  return _i2c_bus->stop_i2c(); 
 }
 
 unsigned int TSL2561::getWhiteLight()
